@@ -76,10 +76,21 @@ python run_glue_with_distillation.py \
   --strategy skip
 
 ```
-**Evaluation on Hate-Speech Tasks**
-
 
 **Results**
 
 On the GLUE development set:
+
+**Cite**
+
+```
+@article{saadi2024Intra,
+  title={Intra-Class Similarity-Guided Feature Distillation},
+  author={Saadi, Khouloud and Mitrovic, Jelena and Granitzer, Michael},
+  journal={NeurIPS ENLSP},
+  year={2023}
+}
+```
+
+**Evaluation on Hate-Speech Tasks**
 

@@ -180,7 +180,7 @@ def train(args, train_dataset, model, tokenizer):
     # train_iterator = trange(epochs_trained, int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0])
     train_iterator = trange(int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0])
 
-    set_seed(args.seed)  # Added here for reproductibility
+    #set_seed(args.seed)  # Added here for reproductibility
 
     best_score = 0
     best_model = {
@@ -681,7 +681,7 @@ def main():
     logger.warning("Process rank: %s, device: %s, n_gpu: %s, distributed training: %s, 16-bits training: %s", args.local_rank, device, args.n_gpu, bool(args.local_rank != -1), args.fp16)
 
     # Set seed
-    set_seed(args.seed)
+    #set_seed(args.seed)
 
     # Prepare GLUE task
     args.task_name = args.task_name.lower()

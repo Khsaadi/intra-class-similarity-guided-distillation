@@ -9,6 +9,7 @@ import logging
 import time
 import numpy as np
 import torch
+import json
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from torch.utils.data.distributed import DistributedSampler
 
@@ -81,7 +82,7 @@ def train(args, train_dataset, student_model, teacher_model, d_criterion, tokeni
          'weight_decay': args.weight_decay},
         {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
-    student_optimizer = AdamW(optimizer_grouped_parameters, lr=lr_s, eps=args.adam_epsilon)
+    student_optimizer = AdamW(optimizer_grouped_parameters, eps=args.adam_epsilon)
     student_scheduler =get_linear_schedule_with_warmup(student_optimizer, num_warmup_steps=args.warmup_steps,  num_training_steps=t_total)
     # Train!
     logger.info("***** Running training *****")
@@ -139,7 +140,7 @@ def train(args, train_dataset, student_model, teacher_model, d_criterion, tokeni
         t_end = time.time()
         logger.info('  Train Time Cost: %.3f' % (t_end - t_start))
         # evaluation
-        results = evaluate(args, student_model, tokenizer, lr_s, k, cont,i, prefix='')
+        results = evaluate(args, student_model, tokenizer, prefix='')
         if args.task_name == 'cola':
             eval_score = results['mcc']
         elif args.task_name == 'sst-2':
@@ -358,7 +359,7 @@ def test(args, model, tokenizer, prefix=""):
         processor = processors[eval_task]()
         label_list = processor.get_labels()
         label_map = {i: label for i, label in enumerate(label_list)}
-        output_eval_file = os.path.join(eval_output_dir, eval_task.upper() + str(i) + "_"+str(k)+"_"+str(lr_s)+"_"+str(cont)+".tsv")
+        output_eval_file = os.path.join(eval_output_dir, eval_task.upper()+".tsv")
         with open(output_eval_file, "w") as writer:
             # logger.info("***** Predict results *****")
             writer.write("index\tprediction\n")
@@ -482,10 +483,10 @@ def main():
     parser.add_argument("--teacher_model", default=None, type=str, help="The teacher model dir.")
     parser.add_argument("--student_model", default=None, type=str, required=True, help="The student model dir.")
     parser.add_argument('--alpha', default=0.5, type=float, help="Vanilla knowledge distillation loss radio.")
-    parser.add_argument('--beta', default=0.5, type=float, help="feature distillation loss contribution.")
+    parser.add_argument('--beta', default=0.01, type=float, help="feature distillation loss contribution.")
     parser.add_argument("--temperature", default=5.0, type=float, help="Distillation temperature for soft target.")
     parser.add_argument('--num_hidden_layers', default=6, type=int, help="The number of layers of the student model.")
-    parser.add_argument('--nearest_neighbors', default=1, type=int, help="The number of nearest neighbors to consider.")
+    parser.add_argument('--nearest_neighbors', default=3, type=int, help="The number of nearest neighbors to consider.")
     parser.add_argument("--teacher_learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam of Teacher model.")
     parser.add_argument("--student_learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam of Student model.")
     parser.add_argument("--strategy", default="first", type=str, help="first | last | skip | both")
