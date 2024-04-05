@@ -95,3 +95,6 @@ On the GLUE development set:
 
 **Evaluation on Hate-Speech Tasks**
 
+```
+Download the hatespeech datasets from: https://drive.google.com/drive/folders/1zimOdJV_mXgTCJDAc0l7UQWhdlp3dRcQ?usp=sharing
+```
