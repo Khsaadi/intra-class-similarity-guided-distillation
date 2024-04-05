@@ -81,6 +81,8 @@ python run_glue_with_distillation.py \
 **Results**
 
 On the GLUE development set:
+<img width="963" alt="res_neur" src="https://github.com/Khsaadi/intra-class-similarity-guided-distillation/assets/58224339/8642ef2e-e5b7-40d3-b886-f00d5c4bfcbe">
+
 
 **Cite**
 
