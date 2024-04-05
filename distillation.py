@@ -40,25 +40,17 @@ class PatientDistillation(nn.Module):
             label = labels[i]
             indices = dicti[str(label.item())]
             elements_orig = torch.index_select(t_features, 0, indices)
-            # dist = torch.norm(s_features[i][None, :,:] - elements, p=2, dim=1)
-            # expanded_1d = s_features[i].unsqueeze(0).expand_as(elements)
             s_feature = torch.reshape(s_features[i], (1,-1))
             elements = torch.reshape(elements_orig, (elements_orig.size(0),-1))
             dist_sub = torch.sub(s_feature, elements)
-            # dist = torch.mean(dist_sub**2,1)
             dist = torch.sum(dist_sub ** 2, 1)
             sorted_dist, indices_to_use = torch.sort(dist)
             if  sorted_dist.size(0)<k:
                 k =  sorted_dist.size(0)
-            # indices_to_use = torch.tensor([i for i in range(k)]).to(args.device)
             indices_to_use = indices_to_use[:k]
-            # dists = torch.index_select(sorted_dist, 0, indices_to_use)
-            # curr_Loss = torch.sum(dists)
             final_elements = torch.index_select(elements_orig, 0, indices_to_use)
             curr_Loss = F.mse_loss(final_elements, s_features[i].unsqueeze(0), reduction='none').mean(dim=(1, 2))
             curr_Loss = torch.sum(curr_Loss)
-            # final_elements = final_elements.mean(0)
-            # curr_Loss = F.mse_loss(final_elements, s_features[i], reduction="mean")
             distill_loss_curr = distill_loss_curr + curr_Loss
         distill_loss = distill_loss_curr
         return train_loss, soft_loss, distill_loss
