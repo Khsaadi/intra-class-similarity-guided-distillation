@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+
 import os
 os.environ["CUDA_VISIBLE_DEVICES"]= "1" # use the gpu number 1
 device ="cuda"
@@ -14,8 +14,8 @@ from sklearn.metrics import classification_report
 
 
 # Download dataset
-imdb = load_dataset("./hateval")
-model_type = "bert-base-uncased"  #"GroNLP/hateBERT"
+imdb = load_dataset("./hateval") # here the path to the dataset
+model_type = "GroNLP/hateBERT"  # here is the hugging-face model
 tokenizer = AutoTokenizer.from_pretrained(model_type,max_length=100)
 
 
@@ -31,19 +31,16 @@ label2id = {"NEGATIVE": 0, "POSITIVE": 1}
 
 # Function to compute the eval metric of the model
 def compute_metrics(eval_pred):
-
-
     predictions, labels = eval_pred
     predictions = np.argmax(predictions, axis=1)
     res = classification_report(labels, predictions, digits=4, output_dict=True)
-    with open('./BERTHatEval.json', 'w') as fp:
+    with open('./BERTHatEval.json', 'w') as fp:  # the output evaluation metric to be written in ./BERTHatEval.json
         json.dump(res, fp)
     macroF1 = res['macro avg']["f1-score"]
     F1posclass = res["1"]["f1-score"]
     finalRes = dict()
     finalRes["macro-average-F1"] = macroF1
     finalRes["F1-positive-class"] = F1posclass
-
     return finalRes
 
 
@@ -55,18 +52,14 @@ model = AutoModelForSequenceClassification.from_pretrained(
 
 # Define the training args
 training_args = TrainingArguments(
-    output_dir="./hatebert_model_fine_tuned_on_hateval/",
+    output_dir="./hatebert_model_fine_tuned_on_hateval/", # specify the output_dir here
     learning_rate=1e-5,
     per_device_train_batch_size=32,
     per_device_eval_batch_size=32,
     num_train_epochs=5,
     weight_decay=0,
     lr_scheduler_type='constant',
-    # save_total_limit=1,
-    # evaluation_strategy="epoch",
     save_strategy="no",
-    # load_best_model_at_end=True
-
    )
 
 
@@ -75,7 +68,6 @@ trainer = Trainer(
     model=model,
     args=training_args,
     train_dataset=tokenized_imdb["train"],
-    # eval_dataset=tokenized_imdb["validation"],
     tokenizer=tokenizer,
     data_collator=data_collator,
     compute_metrics=compute_metrics,
@@ -84,16 +76,15 @@ trainer = Trainer(
 
 # Train and save the model
 trainer.train()
-trainer.save_model('./bert/hateval')
+trainer.save_model('./teacher/hateval') # specify the path where to save the final trained model
 
 
 # Eval
-model_checkpoint = './bert/hateval'
+model_checkpoint = './teacher/hateval' # specify the model to load for evaluation
 model_tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 model_finetuned = AutoModelForSequenceClassification.from_pretrained(model_checkpoint,num_labels=2, id2label=id2label, label2id=label2id)
 
-OUTPUT_DIR = "./output"
-
+OUTPUT_DIR = "./output" # specify the second trainer output_dir
 test_args = TrainingArguments(
     output_dir = OUTPUT_DIR,
     do_train = False,

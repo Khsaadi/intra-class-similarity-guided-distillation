@@ -74,7 +74,7 @@ class DistillationTrainingArguments(TrainingArguments):
 
 # Distillation Trainer
 class DistillationTrainer(Trainer):
-    def __init__(self, *args, k = 1, teacher_model=None, **kwargs):
+    def __init__(self, *args, k, teacher_model=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.teacher = teacher_model
         self.KNN=k
@@ -190,7 +190,9 @@ def main():
         required=True,
         help="The output directory where the model checkpoints and predictions will be written.",
     )
-
+    parser.add_argument(
+        "--nearest_neighbors", default=2, type=int, help="number of nearest neighbors to consider."
+    )
     parser.add_argument(
         "--alpha_ce", default=0.5, type=float, help="Typical cross entropy loss."
     )
@@ -204,128 +206,86 @@ def main():
 
     )
     parser.add_argument(
+        "--learning_rate", default=5e-5, type=float, help="the student model learning rate."
+
+    )
+    parser.add_argument(
         "--temperature", default=2.0, type=float,
         help="temperature for soft diatillation. Only for distillation."
 
     )
 
     args = parser.parse_args()
-    # dataset = load_dataset(args.dataset_path)  # "./hateval"
-    # student_tokenizer = AutoTokenizer.from_pretrained(args.student_model_name_or_path)  #"GroNLP/hateBERT"
-    # data_collator = DataCollatorWithPadding(tokenizer=student_tokenizer)
-    # student_model = get_student(args)
-    # # Process the data
-    # id2label = {0: "NEGATIVE", 1: "POSITIVE"}
-    # label2id = {"NEGATIVE": 0, "POSITIVE": 1}
-    # num_train_examples = len(dataset['train'])
-    # num_eval_examples = len(dataset['test'])
-    # train_ds, eval_ds, eval_examples, train_labels, test_labels = convert_examples_to_features(dataset, num_train_examples, num_eval_examples)
-    # logging_steps = len(train_ds) // args.train_batch_size
+    dataset = load_dataset(args.dataset_path)  # "./hateval"
+    student_tokenizer = AutoTokenizer.from_pretrained(args.student_model_name_or_path)  # "GroNLP/hateBERT"
+    data_collator = DataCollatorWithPadding(tokenizer=student_tokenizer)
+    student_model = get_student(args)
+    # Process the data
+    id2label = {0: "NEGATIVE", 1: "POSITIVE"}
+    label2id = {"NEGATIVE": 0, "POSITIVE": 1}
+    num_train_examples = len(dataset['train'])
+    num_eval_examples = len(dataset['test'])
+    train_ds, eval_ds, eval_examples, train_labels, test_labels = convert_examples_to_features(dataset,
+                                                                                               num_train_examples,
+                                                                                               num_eval_examples)
+    logging_steps = len(train_ds) // args.train_batch_size
+    student_training_args = DistillationTrainingArguments(alpha_ce = args.alpha_ce, alpha_soft= args.alpha_soft, alpha_mse=args.alpha_mse, temperature=args.temperature,
+        output_dir = "./distiled_models",
+        save_strategy="no",
+        learning_rate=args.learning_rate,
+        lr_scheduler_type='constant',
+        per_device_train_batch_size=args.train_batch_size,
+        per_device_eval_batch_size=args.test_batch_size,
+        num_train_epochs=3,
+        weight_decay=0,
+        overwrite_output_dir=True,
+        logging_steps=logging_steps,
+        do_eval=False,
+    )
+    print(f"Number of training examples: {train_ds.num_rows}")
+    print(f"Number of validation examples: {eval_ds.num_rows}")
+    print(f"Number of raw validation examples: {eval_examples.num_rows}")
+    print(f"Logging steps: {logging_steps}")
 
+    # Set the teacher model
+    teacher_model = AutoModelForSequenceClassification.from_pretrained(args.teacher_model_name_or_path).to(device)
 
-    # for k in [1,2,3,5]:
-    #     for lr in [1e-5]:
-    #         for cont in [0.1,0.01,0.001,1]:
-            #for cont in [1]:
-    for k in [2]:
-        for lr in [5e-5]:
-            for cont in [0.01]:
-                final_res = dict()
-                stdevmacroF1 = []
-                stdevposF1 = []
-                for i in range(4):
-                    dataset = load_dataset(args.dataset_path)  # "./hateval"
-                    student_tokenizer = AutoTokenizer.from_pretrained(
-                        args.student_model_name_or_path)  # "GroNLP/hateBERT"
-                    data_collator = DataCollatorWithPadding(tokenizer=student_tokenizer)
-                    student_model = get_student(args)
-                    # Process the data
-                    id2label = {0: "NEGATIVE", 1: "POSITIVE"}
-                    label2id = {"NEGATIVE": 0, "POSITIVE": 1}
-                    num_train_examples = len(dataset['train'])
-                    num_eval_examples = len(dataset['test'])
-                    train_ds, eval_ds, eval_examples, train_labels, test_labels = convert_examples_to_features(dataset,
-                                                                                                               num_train_examples,
-                                                                                                               num_eval_examples)
-                    logging_steps = len(train_ds) // args.train_batch_size
+    distil_trainer = DistillationTrainer(
+        model=student_model,
+        teacher_model=teacher_model,
+        k= args.nearest_neighbors,
+        args=student_training_args,
+        train_dataset=train_ds,
+        tokenizer=student_tokenizer,
+    )
 
-                    student_training_args = DistillationTrainingArguments(alpha_ce = args.alpha_ce, alpha_soft= args.alpha_soft, alpha_mse=cont, temperature=args.temperature,
-                        output_dir = "./distiled_models",
-                        save_strategy="no",
-                        learning_rate=lr,
-                        lr_scheduler_type='constant',
-                        per_device_train_batch_size=args.train_batch_size,
-                        per_device_eval_batch_size=args.test_batch_size,
-                        num_train_epochs=3,
-                        weight_decay=0,
-                        overwrite_output_dir=True,
-                        logging_steps=logging_steps,
-                        do_eval=False,
-                    )
-                    print(f"Number of training examples: {train_ds.num_rows}")
-                    print(f"Number of validation examples: {eval_ds.num_rows}")
-                    print(f"Number of raw validation examples: {eval_examples.num_rows}")
-                    print(f"Logging steps: {logging_steps}")
+    distil_trainer.train()  # train
+    distil_trainer.save_model(args.output_dir)  # save the mode to the specified path "./student/hateval"
 
-                    # Set the teacher model
-                    teacher_model = AutoModelForSequenceClassification.from_pretrained(args.teacher_model_name_or_path).to(device)
+    # Eval
+    student_model = args.output_dir  # use the save student model
+    student_finetuned = AutoModelForSequenceClassification.from_pretrained(student_model, num_labels=2,
+                                                                           id2label=id2label, label2id=label2id)
+    test_args = TrainingArguments(
+        output_dir = "./distiled_models",
+        do_train=False,
+        do_eval=True,
+        save_strategy = "no",
+        overwrite_output_dir = True,
+        per_device_eval_batch_size=args.test_batch_size,
+        dataloader_drop_last=False)
+    student_trainer = Trainer(
+        model=student_finetuned,
+        args=test_args,
+        data_collator=data_collator,
+        compute_metrics=compute_metrics,
+        tokenizer=student_tokenizer)
 
-                    distil_trainer = DistillationTrainer(
-                        model=student_model,
-                        teacher_model=teacher_model,
-                        k=k,
-                        args=student_training_args,
-                        train_dataset=train_ds,
-                        tokenizer=student_tokenizer,
-                    )
+    # Print the results
+    res = student_trainer.evaluate(eval_ds)
+    with open("./reshatebert.json", 'w') as fp: # the file path that contains the output results
+          json.dump(res, fp)
 
-                    distil_trainer.train()  # train
-                    distil_trainer.save_model(args.output_dir)  # save the mode to the specified path "./student/hateval"
-
-                    # Eval
-                    student_model = args.output_dir  # use the save student model
-                    student_finetuned = AutoModelForSequenceClassification.from_pretrained(student_model, num_labels=2,
-                                                                                           id2label=id2label, label2id=label2id)
-                    test_args = TrainingArguments(
-                        output_dir = "./distiled_models",
-                        do_train=False,
-                        do_eval=True,
-                        save_strategy = "no",
-                        overwrite_output_dir = True,
-                        per_device_eval_batch_size=args.test_batch_size,
-                        dataloader_drop_last=False)
-                    student_trainer = Trainer(
-                        model=student_finetuned,
-                        args=test_args,
-                        data_collator=data_collator,
-                        compute_metrics=compute_metrics,
-                        tokenizer=student_tokenizer)
-                    # Print the results
-                    res = student_trainer.evaluate(eval_ds)
-                    with open("./reshatebert3"+str(k)+str(lr)+str(cont)+str(i)+".json", 'w') as fp:
-                          json.dump(res, fp)
-
-                    if "eval_macro-average-F1" not in final_res:
-                        final_res["eval_macro-average-F1"] = res["eval_macro-average-F1"]
-                    else:
-                        final_res["eval_macro-average-F1"] = final_res["eval_macro-average-F1"] + res["eval_macro-average-F1"]
-                    if "eval_F1-positive-class" not in final_res:
-                        final_res["eval_F1-positive-class"] = res["eval_F1-positive-class"]
-                    else:
-                        final_res["eval_F1-positive-class"] = final_res["eval_F1-positive-class"] + res["eval_F1-positive-class"]
-                    stdevmacroF1.append(res["eval_macro-average-F1"])
-                    stdevposF1.append(res["eval_F1-positive-class"])
-
-                final_res["eval_macro-average-F1"] = final_res["eval_macro-average-F1"]/4
-
-                final_res["eval_F1-positive-class"] = final_res["eval_F1-positive-class"]/4
-
-
-                final_res["eval_F1-positive-class-stdev"] = statistics.stdev(stdevposF1)
-                final_res["eval_macro-average-F1-stdev"] = statistics.stdev(stdevmacroF1)
-
-                with open("./FinalReshatebert3" + str(k) + str(lr) + str(cont) + ".json", 'w') as fp:
-                    json.dump(final_res, fp)
 
 
 if __name__ == "__main__":
