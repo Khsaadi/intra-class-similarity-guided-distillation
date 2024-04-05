@@ -65,13 +65,14 @@ python run_glue_with_distillation.py \
   --do_train \
   --per_gpu_train_batch_size 32 \
   --per_gpu_eval_batch_size 32 \
-  --teacher_learning_rate 5e-5 \
-  --student_learning_rate 5e-5 \
+  --student_learning_rate 3e-5 \
   --num_train_epochs 5 \
   --output_dir ./model/RTE/student/ \
   --overwrite_output_dir \
   --alpha 0.5 \
+  --beta 0.01 \
   --num_hidden_layers 6 \
+  --nearest_neighbors 3 \
   --temperature 5.0 \
   --strategy skip
 
