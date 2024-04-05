@@ -98,5 +98,18 @@ On the GLUE development set:
 **Evaluation on Hate-Speech Tasks**
 
 ```
-Download the hatespeech datasets from: https://drive.google.com/drive/folders/1zimOdJV_mXgTCJDAc0l7UQWhdlp3dRcQ?usp=sharing
+Download the hatespeech datasets under evaluation-on-hatespeech: https://drive.google.com/drive/folders/1zimOdJV_mXgTCJDAc0l7UQWhdlp3dRcQ?usp=sharing
+```
+*Fine-tuning*
+
+```
+cd evaluation-on-hatespeech
+python fine_tune_hatebert.py
+```
+
+*Distillation*
+
+```
+cd evaluation-on-hatespeech
+python distil_hatebert.py --student_model_name_or_path GroNLP/hateBERT  --teacher_model_name_or_path ./teacher/hateval --dataset_path ./hateval --train_batch_size 32 --test_batch_size 32 --output_dir ./student/hateval
 ```
